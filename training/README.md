@@ -57,32 +57,40 @@ BASE=$(find ~ -name 'all_arabic_scripts.mlmodel' | head -1); echo "$BASE"
 
 **4. Train (transfer-learn on the handwriting lines)**
 
-```bash
-# Flags occasionally change between kraken versions — verify with
-# `ketos train --help`. `--resize union` adapts the character set to Muharaf.
-!ketos train -d cuda:0 --format-type path --resize union \
-    -i "$BASE" -o muharaf_hw \
-    -e $(ls data/validation/*.png) \
-    $(ls data/train/*.png)
+```python
+# Kraken 7: -d/--device is a `ketos` group option (BEFORE `train`); -o is a
+# DIRECTORY (checkpoints land in muharaf_hw/). --resize union adapts the codec.
+import glob, os
+base = glob.glob(os.path.expanduser("~/.local/share/htrmopo/**/*.mlmodel"), recursive=True)[0]
+cmd = f'ketos -d cuda:0 train -f path --resize union -i "{base}" -o muharaf_hw data/train/*.png'
+print(cmd)
+!{cmd}
 ```
 
-Early-stopping writes `muharaf_hw_best.mlmodel`. Expect a few hours on a T4.
+Checkpoints are written into `muharaf_hw/`. Expect a few hours on a T4.
 
 **5. Evaluate on the held-out test split (clean recognition CER)**
 
-```bash
-!ketos test -d cuda:0 --format-type path -m muharaf_hw_best.mlmodel \
-    $(ls data/test/*.png)
+```python
+import glob
+ckpts = sorted(glob.glob("muharaf_hw/*.mlmodel"))
+model = ([c for c in ckpts if "best" in c] or ckpts)[-1]
+!ketos -d cuda:0 test -f path -m "{model}" data/test/*.png
 # Reports character accuracy / CER. Compare to the printed model + to Claude's
 # ~38% confidence baseline. Sub-10% CER on this hand class is a strong result.
 ```
 
-**6. Download the model**
+**6. Save the model to Google Drive** (reliable from VS Code or browser)
 
 ```python
-from google.colab import files
-files.download('muharaf_hw_best.mlmodel')
+import glob
+ckpts = sorted(glob.glob("muharaf_hw/*.mlmodel"))
+best = ([c for c in ckpts if "best" in c] or ckpts)[-1]
+from google.colab import drive
+drive.mount("/content/drive")
+!cp "{best}" /content/drive/MyDrive/muharaf_hw_best.mlmodel
 ```
+Then download `muharaf_hw_best.mlmodel` from drive.google.com to `~/Downloads`.
 
 ## Plug it into the local app — DEMO-GATED (non-commercial)
 
