@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import sharp from 'sharp';
 import { config } from '../../lib/config.js';
 import { callLlmJson } from '../llm/anthropic-client.js';
 import { registerAdapter } from '../registry.js';
@@ -34,7 +35,15 @@ export const llmVisionAdapter: TranscribeAdapter = {
     handlesHandwriting: true,
   },
 
-  async transcribe({ imageBuffer, mediaType = 'image/png', sourceLanguageHint }) {
+  async transcribe({ imageBuffer, sourceLanguageHint }) {
+    // Downscale + recompress: vision models read well at a moderate resolution,
+    // and this keeps large scans within request size limits and lowers cost.
+    const jpeg = await sharp(imageBuffer)
+      .rotate()
+      .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
     const { data, model } = await callLlmJson(
       {
         model: config.MODEL_VISION_NAME,
@@ -44,8 +53,8 @@ export const llmVisionAdapter: TranscribeAdapter = {
             type: 'image',
             source: {
               type: 'base64',
-              media_type: mediaType as 'image/png' | 'image/jpeg' | 'image/webp',
-              data: imageBuffer.toString('base64'),
+              media_type: 'image/jpeg',
+              data: jpeg.toString('base64'),
             },
           },
           { type: 'text', text: buildTranscribeUserText(sourceLanguageHint) },
