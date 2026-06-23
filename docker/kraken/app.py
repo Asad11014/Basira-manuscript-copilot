@@ -38,13 +38,25 @@ def build_command(in_path: str, out_path: str, model_path: str) -> list[str]:
     return cmd
 
 
+def model_for_slot(slot):
+    """Find the model file for a slot, accepting either Kraken format
+    (.mlmodel CoreML, or .safetensors from `ketos train`)."""
+    import glob
+    for ext in (".mlmodel", ".safetensors"):
+        p = f"/models/{slot}{ext}"
+        if os.path.exists(p):
+            return p
+    hits = sorted(glob.glob(f"/models/{slot}.*"))
+    return hits[0] if hits else f"/models/{slot}.mlmodel"
+
+
 def resolve_model(model_param):
-    """Pick the recognition model. A `model` form field selects
-    /models/<name>.mlmodel (e.g. 'muharaf'); otherwise the default is used."""
+    """Pick the recognition model. A `model` form field selects the
+    /models/<name>.* slot (e.g. 'muharaf'); otherwise the default is used."""
     if model_param:
         safe = os.path.basename(str(model_param))  # block path traversal
-        path = f"/models/{safe}.mlmodel"
-        return path, f"kraken-{safe}", f"{safe}.mlmodel"
+        path = model_for_slot(safe)
+        return path, f"kraken-{safe}", os.path.basename(path)
     return MODEL, MODEL_NAME, MODEL_VERSION
 
 

@@ -58,39 +58,44 @@ BASE=$(find ~ -name 'all_arabic_scripts.mlmodel' | head -1); echo "$BASE"
 **4. Train (transfer-learn on the handwriting lines)**
 
 ```python
-# Kraken 7: -d/--device is a `ketos` group option (BEFORE `train`); -o is a
-# DIRECTORY (checkpoints land in muharaf_hw/). --resize union adapts the codec.
+# Kraken 7: compile to a binary dataset first; --force-type baseline matches the
+# line-strip data to the baseline base model; -d/--device is a `ketos` group
+# option (before `train`); -o is a DIRECTORY.
 import glob, os
 base = glob.glob(os.path.expanduser("~/.local/share/htrmopo/**/*.mlmodel"), recursive=True)[0]
-cmd = f'ketos -d cuda:0 train -f path --resize union -i "{base}" -o muharaf_hw data/train/*.png'
+!ketos compile -f path --force-type baseline -o muharaf_train.arrow data/train/*.png
+cmd = f'ketos -d cuda:0 train -f binary --resize union -i "{base}" -o muharaf_hw muharaf_train.arrow'
 print(cmd)
 !{cmd}
 ```
 
-Checkpoints are written into `muharaf_hw/`. Expect a few hours on a T4.
+Watch `val_accuracy` each epoch — that's held-out character accuracy
+(CER ≈ 1 − val_accuracy). The best model (a `.safetensors` file) is written into
+`muharaf_hw/`. Expect a few hours on a T4.
 
 **5. Evaluate on the held-out test split (clean recognition CER)**
 
+The held-out **val_accuracy** printed during training (step 4) is your metric —
+compare it to the printed model and to Claude's ~0.38. (Kraken 7's standalone
+`ketos test` needs a binary dataset with a `test` partition, which `compile`
+doesn't emit, so the in-training validation accuracy is the clean signal.)
+
+Locate the best model:
 ```python
 import glob
-ckpts = sorted(glob.glob("muharaf_hw/*.mlmodel"))
-model = ([c for c in ckpts if "best" in c] or ckpts)[-1]
-!ketos -d cuda:0 test -f path -m "{model}" data/test/*.png
-# Reports character accuracy / CER. Compare to the printed model + to Claude's
-# ~38% confidence baseline. Sub-10% CER on this hand class is a strong result.
+print(sorted(glob.glob("muharaf_hw/*.safetensors"))[-1])
 ```
 
 **6. Save the model to Google Drive** (reliable from VS Code or browser)
 
 ```python
-import glob
-ckpts = sorted(glob.glob("muharaf_hw/*.mlmodel"))
-best = ([c for c in ckpts if "best" in c] or ckpts)[-1]
+import glob, shutil
+best = sorted(glob.glob("muharaf_hw/*.safetensors"))[-1]
 from google.colab import drive
 drive.mount("/content/drive")
-!cp "{best}" /content/drive/MyDrive/muharaf_hw_best.mlmodel
+shutil.copy(best, "/content/drive/MyDrive/muharaf_hw_best.safetensors")
 ```
-Then download `muharaf_hw_best.mlmodel` from drive.google.com to `~/Downloads`.
+Then download `muharaf_hw_best.safetensors` from drive.google.com to `~/Downloads`.
 
 ## Plug it into the local app — DEMO-GATED (non-commercial)
 
@@ -102,7 +107,7 @@ outputs are excluded from the ground-truth/training export.
 From the repo root, with the Kraken sidecar running:
 
 ```bash
-scripts/install-kraken-model.sh ~/Downloads/muharaf_hw_best.mlmodel muharaf
+scripts/install-kraken-model.sh ~/Downloads/muharaf_hw_best.safetensors muharaf
 ```
 
 Then in `.env`:

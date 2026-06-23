@@ -15,8 +15,10 @@ if [ -z "$CONTAINER" ]; then
   exit 1
 fi
 
-echo "→ Copying $(basename "$MODEL") into the sidecar as /models/${SLOT}.mlmodel…"
-docker cp "$MODEL" "$CONTAINER:/models/${SLOT}.mlmodel"
+# Preserve the source extension (.mlmodel or .safetensors — kraken loads both).
+EXT="${MODEL##*.}"
+echo "→ Copying $(basename "$MODEL") into the sidecar as /models/${SLOT}.${EXT}…"
+docker cp "$MODEL" "$CONTAINER:/models/${SLOT}.${EXT}"
 docker compose --profile kraken restart kraken >/dev/null
 sleep 3
 echo "→ Health:"
