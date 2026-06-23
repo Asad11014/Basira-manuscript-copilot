@@ -27,15 +27,25 @@ SEG_MODE = os.environ.get("KRAKEN_SEG_MODE", "box")
 BASE_DIR = os.environ.get("KRAKEN_BASE_DIR", "R")
 
 
-def build_command(in_path: str, out_path: str) -> list[str]:
+def build_command(in_path: str, out_path: str, model_path: str) -> list[str]:
     cmd = ["kraken", "-i", in_path, out_path]
     if SEG_MODE == "baseline":
         cmd += ["segment", "-bl", "ocr"]
     else:
         # Legacy box segmenter on a binarized image — light and accurate on print.
         cmd += ["binarize", "segment", "ocr"]
-    cmd += ["--base-dir", BASE_DIR, "-m", MODEL]
+    cmd += ["--base-dir", BASE_DIR, "-m", model_path]
     return cmd
+
+
+def resolve_model(model_param):
+    """Pick the recognition model. A `model` form field selects
+    /models/<name>.mlmodel (e.g. 'muharaf'); otherwise the default is used."""
+    if model_param:
+        safe = os.path.basename(str(model_param))  # block path traversal
+        path = f"/models/{safe}.mlmodel"
+        return path, f"kraken-{safe}", f"{safe}.mlmodel"
+    return MODEL, MODEL_NAME, MODEL_VERSION
 
 
 @app.get("/healthz")
@@ -52,13 +62,14 @@ def healthz():
 
 @app.post("/transcribe")
 def transcribe():
-    if not os.path.exists(MODEL):
+    model_path, model_name, model_version = resolve_model(request.form.get("model"))
+    if not os.path.exists(model_path):
         return (
             jsonify(
                 {
                     "error": (
-                        f"No recognition model at {MODEL}. Install a Kraken .mlmodel "
-                        "(see KRAKEN_MODEL_DOI / scripts)."
+                        f"No recognition model at {model_path}. Install a Kraken "
+                        ".mlmodel there (see scripts/install-kraken-model.sh)."
                     )
                 }
             ),
@@ -73,7 +84,7 @@ def transcribe():
         request.files["image"].save(in_path)
 
         proc = subprocess.run(
-            build_command(in_path, out_path),
+            build_command(in_path, out_path, model_path),
             capture_output=True,
             text=True,
         )
@@ -96,8 +107,8 @@ def transcribe():
             "text": text.strip(),
             "lines": lines,
             "confidence": None,
-            "model_name": MODEL_NAME,
-            "model_version": MODEL_VERSION,
+            "model_name": model_name,
+            "model_version": model_version,
         }
     )
 

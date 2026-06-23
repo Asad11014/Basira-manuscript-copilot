@@ -17,6 +17,7 @@ import {
   findManuscriptForOrg,
   getManuscript,
 } from '../services/manuscript.service.js';
+import { buildGroundTruthZip } from '../services/ground-truth.service.js';
 import { enqueueJob } from '../jobs/enqueue.js';
 import { toJobDto } from '../serializers/job.serializer.js';
 
@@ -63,6 +64,19 @@ manuscriptRoutes.get(
   asyncHandler<Page[]>(async (req, res) => {
     const { pages } = await getManuscript(getAuthUser(req), param(req, 'id'));
     res.json(pages);
+  }),
+);
+
+// Export Kraken-trainable ground truth (owned-data flywheel; excludes
+// restricted-model outputs). Editor/admin only. (§20)
+manuscriptRoutes.get(
+  '/:id/ground-truth',
+  requireRole('admin', 'editor'),
+  asyncHandler(async (req, res) => {
+    const result = await buildGroundTruthZip(getAuthUser(req), param(req, 'id'));
+    res.set('Content-Type', 'application/zip');
+    res.set('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.send(result.zip);
   }),
 );
 

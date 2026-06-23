@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { EXPORT_FORMATS, type ExportFormat } from '@basira/shared';
+import { apiUrl } from '../../api/client.js';
 import { exportsApi } from '../../api/exports.js';
 import { manuscriptsApi } from '../../api/manuscripts.js';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -69,6 +70,15 @@ export function ManuscriptToolbar({ manuscriptId }: { manuscriptId: string }) {
             : 'Batch transcribe all'}
         </Button>
       )}
+      <Button
+        variant="ghost"
+        onClick={() =>
+          window.open(apiUrl(`/manuscripts/${manuscriptId}/ground-truth`), '_blank')
+        }
+        title="Download Kraken-trainable line data (your corrected pages)"
+      >
+        Training data
+      </Button>
       <div className="flex items-center gap-1">
         <select
           value={format}

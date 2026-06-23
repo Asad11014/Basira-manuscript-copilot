@@ -20,6 +20,7 @@ import {
   getPageImage,
 } from '../services/page.service.js';
 import { listTranscriptions } from '../services/transcription.service.js';
+import { resolveTranscribeAdapterKey } from '../services/transcribe-access.js';
 import { listAnnotations } from '../services/annotation.service.js';
 import { listEntities } from '../services/entity.service.js';
 import { enqueueJob } from '../jobs/enqueue.js';
@@ -68,11 +69,15 @@ pageRoutes.post(
     const input = parseBody(transcribeRequestSchema, req);
     await findPageForOrg(user.orgId, pageId); // authorize before enqueue
 
+    // Licence gating: restricted models (Muharaf) are demo-user-only; the demo
+    // user is routed to the gated model by default. (transcribe-access.ts)
+    const adapterKey = resolveTranscribeAdapterKey(user, input.adapterKey);
+
     const job = await enqueueJob({
       type: 'transcribe',
       entityRef: pageId,
       orgId: user.orgId,
-      adapterKey: input.adapterKey,
+      adapterKey,
       data: { sourceLanguageHint: input.sourceLanguageHint },
     });
     res.status(202).json(toJobDto(job));

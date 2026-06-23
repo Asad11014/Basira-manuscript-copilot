@@ -50,6 +50,12 @@ const envSchema = z.object({
   // Kraken HTR sidecar (used when TRANSCRIBE_ADAPTER=kraken).
   KRAKEN_URL: z.string().url().default('http://localhost:8500'),
 
+  // Licence-gating for restricted models (e.g. the non-commercial Muharaf model
+  // is exposed ONLY to the demo user for stakeholder pitches — never commercial).
+  DEMO_USER_EMAIL: z.string().default('demo@basira.test'),
+  DEMO_TRANSCRIBE_ADAPTER: z.string().default(''),
+  RESTRICTED_TRANSCRIBE_ADAPTERS: z.string().default(''),
+
   MAX_UPLOAD_MB: z.coerce.number().int().default(100),
   DEFAULT_TARGET_LANG: z.string().default('en'),
 });

@@ -80,23 +80,37 @@ from google.colab import files
 files.download('muharaf_hw_best.mlmodel')
 ```
 
-## Plug it into the local app
+## Plug it into the local app — DEMO-GATED (non-commercial)
+
+Because Muharaf is non-commercial, this model is installed into the **gated
+`muharaf` slot**, reachable only via the `kraken-muharaf` adapter, which is
+**restricted to the demo user**. Commercial users can never invoke it, and its
+outputs are excluded from the ground-truth/training export.
 
 From the repo root, with the Kraken sidecar running:
 
 ```bash
-scripts/install-kraken-model.sh ~/Downloads/muharaf_hw_best.mlmodel
+scripts/install-kraken-model.sh ~/Downloads/muharaf_hw_best.mlmodel muharaf
 ```
 
-Then set provenance + ensure the adapter in `.env`:
+Then in `.env`:
 
 ```
-TRANSCRIBE_ADAPTER=kraken
-KRAKEN_MODEL_NAME=kraken-muharaf-handwriting
-KRAKEN_MODEL_VERSION=Muharaf handwriting (transfer-learned from OpenITI)
+DEMO_TRANSCRIBE_ADAPTER=kraken-muharaf   # demo user's transcriptions use it
+# RESTRICTED_TRANSCRIBE_ADAPTERS=kraken-muharaf  (already set — keeps it gated)
 ```
 
-Restart the app (`pnpm dev`) and re-transcribe a page in the UI.
+Restart the app (`pnpm dev`), log in as the **demo user** (`demo@basira.test`),
+and transcribe — it runs the handwriting model. Any other user is blocked (403).
+
+## The commercial path — owned data, no licence issue
+
+For the production model, don't train on Muharaf. Use **your own** scholar-
+corrected pages: in the app, open a manuscript → **Training data** (toolbar) to
+download a Kraken-trainable ZIP (`GET /manuscripts/:id/ground-truth`). It emits
+line image ↔ text pairs from corrected transcriptions and **excludes any page
+transcribed by a restricted model**, so the training set stays commercially
+clean. Feed that ZIP into the same `ketos train` flow above.
 
 ## Notes
 
