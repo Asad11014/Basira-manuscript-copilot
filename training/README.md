@@ -1,5 +1,9 @@
 # Training a custom Kraken handwriting model (Muharaf)
 
+> **Ready-to-run notebook:** open **`training/muharaf_kraken_colab.ipynb`** —
+> connect a Colab GPU runtime and **Run All**. The steps below are the same cells,
+> documented.
+
 Goal: a Kraken **recognition** model for historical Arabic *handwriting*, to
 replace the printed-Arabic OpenITI model. We transfer-learn from the OpenITI
 model (it already knows the Arabic alphabet) on the **`aamijar/muharaf-public`**
