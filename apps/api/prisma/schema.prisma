@@ -1,0 +1,355 @@
+// Basira data model (§7).
+//
+// Rules baked into this schema:
+//  - Every table carries id/createdAt/updatedAt audit columns.
+//  - Transcriptions & translations are APPEND-ONLY versioned: editing creates a
+//    new row and flips `isCurrent`. Never hard-update text in place. (§7)
+//  - Every generated artefact stores `provenance` (Json) — adapter, model,
+//    version, timestamp. No artefact without provenance. (§0.4, §8)
+//  - Org scoping is enforced in services; FKs make the tenancy graph explicit.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  editor
+  viewer
+}
+
+enum PageStatus {
+  uploaded
+  preprocessed
+  transcribed
+  translated
+}
+
+enum RegionType {
+  textblock
+  line
+  margin
+}
+
+enum JobType {
+  preprocess
+  transcribe
+  translate
+  ner
+  export
+  batch
+}
+
+enum JobStatus {
+  queued
+  running
+  done
+  failed
+}
+
+enum AnnotationKind {
+  comment
+  gloss
+  citationFlag
+  uncertainFlag
+}
+
+enum EntityType {
+  person
+  work
+  place
+  citation
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  plan      String   @default("free")
+  seatLimit Int      @default(5)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  projects      Project[]
+  auditLogs     AuditLog[]
+  subscriptions Subscription[]
+  seats         Seat[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  orgId        String
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(editor)
+  disabled     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  org            Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  transcriptions Transcription[]
+  annotations    Annotation[]
+  auditLogs      AuditLog[]
+  exports        ExportArtifact[]
+  seat           Seat?
+
+  @@index([orgId])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  orgId       String
+  name        String
+  description String?
+  tags        String[] @default([])
+  // Per-project glossary injected into the translation prompt. (§8)
+  glossary    Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  manuscripts Manuscript[]
+
+  @@index([orgId])
+}
+
+model Manuscript {
+  id              String   @id @default(cuid())
+  projectId       String
+  title           String
+  sourceLanguage  String
+  script          String
+  metadata        Json     @default("{}")
+  originalFileKey String?
+  witnessGroupId  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pages   Page[]
+
+  @@index([projectId])
+  @@index([witnessGroupId])
+}
+
+model Page {
+  id                String     @id @default(cuid())
+  manuscriptId      String
+  index             Int
+  originalImageKey  String
+  processedImageKey String?
+  thumbnailKey      String?
+  width             Int?
+  height            Int?
+  status            PageStatus @default(uploaded)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  manuscript     Manuscript      @relation(fields: [manuscriptId], references: [id], onDelete: Cascade)
+  regions        Region[]
+  transcriptions Transcription[]
+  entities       Entity[]
+  annotations    Annotation[]
+
+  @@unique([manuscriptId, index])
+  @@index([manuscriptId])
+}
+
+model Region {
+  id        String     @id @default(cuid())
+  pageId    String
+  type      RegionType
+  // Bounding box normalised 0..1: { x, y, w, h }
+  bbox      Json
+  order     Int
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+}
+
+model Transcription {
+  id              String   @id @default(cuid())
+  pageId          String
+  version         Int
+  text            String
+  // regionId -> text
+  perRegionText   Json?
+  confidence      Float?
+  // adapter, modelName, modelVersion, generatedAt — mandatory. (§8)
+  provenance      Json
+  createdByUserId String?
+  isCurrent       Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  page         Page          @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  createdBy    User?         @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  translations Translation[]
+  entities     Entity[]
+  annotations  Annotation[]
+
+  @@unique([pageId, version])
+  @@index([pageId, isCurrent])
+}
+
+model Translation {
+  id              String   @id @default(cuid())
+  transcriptionId String
+  version         Int
+  targetLang      String
+  text            String
+  // source passage <-> target passage alignment
+  alignment       Json?
+  glosses         Json?
+  provenance      Json
+  createdByUserId String?
+  isCurrent       Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transcription Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([transcriptionId, targetLang, version])
+  @@index([transcriptionId, isCurrent])
+}
+
+model Entity {
+  id              String     @id @default(cuid())
+  pageId          String
+  transcriptionId String?
+  type            EntityType
+  surfaceText     String
+  normalizedName  String?
+  // [start, end] character span into the transcription text
+  span            Json?
+  provenance      Json
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  page          Page           @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  transcription Transcription? @relation(fields: [transcriptionId], references: [id], onDelete: SetNull)
+
+  @@index([pageId])
+  @@index([type])
+  @@index([normalizedName])
+}
+
+model Annotation {
+  id              String         @id @default(cuid())
+  pageId          String?
+  transcriptionId String?
+  userId          String
+  kind            AnnotationKind
+  body            String
+  // { regionId?, span?: [start, end] }
+  anchor          Json
+  resolved        Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  page          Page?          @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  transcription Transcription? @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+  @@index([transcriptionId])
+  @@index([userId])
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  type        JobType
+  status      JobStatus @default(queued)
+  // Polymorphic reference to the operated-on entity (e.g. pageId, manuscriptId).
+  entityRef   String
+  progress    Int       @default(0)
+  error       String?
+  adapterKey  String?
+  resultRef   String?
+  parentJobId String?
+  // Denormalised org id for audit/listing scope.
+  orgId       String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  parent   Job?  @relation("JobChildren", fields: [parentJobId], references: [id], onDelete: Cascade)
+  children Job[] @relation("JobChildren")
+
+  @@index([orgId])
+  @@index([entityRef])
+  @@index([parentJobId])
+  @@index([status])
+}
+
+model ExportArtifact {
+  id                String   @id @default(cuid())
+  manuscriptId      String?
+  projectId         String?
+  format            String
+  fileKey           String
+  requestedByUserId String
+  orgId             String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  requestedBy User @relation(fields: [requestedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([manuscriptId])
+  @@index([projectId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  orgId      String
+  userId     String?
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+  @@index([targetType, targetId])
+}
+
+// ── Commercial layer: modelled but INERT in MVP (no payment gateway). (§3, §15) ──
+
+model Subscription {
+  id        String   @id @default(cuid())
+  orgId     String
+  plan      String
+  status    String   @default("inactive")
+  seats     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+model Seat {
+  id        String   @id @default(cuid())
+  orgId     String
+  userId    String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+}

@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"],
+    // DOM types only — pdf.js render typings reference CanvasRenderingContext2D.
+    // No browser globals are used at runtime in the API.
+    "lib": ["ES2022", "DOM"],
+    "noEmit": false
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}

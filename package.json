@@ -1,0 +1,35 @@
+{
+  "name": "basira",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Basira — Islamic Manuscript Copilot (MVP). Scan, transcribe, translate, and annotate historic Islamic manuscripts.",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --stream dev",
+    "dev:demo": "TRANSCRIBE_ADAPTER=demo TRANSLATE_ADAPTER=demo pnpm -r --parallel --stream dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "db:generate": "pnpm --filter @basira/api db:generate",
+    "db:migrate": "pnpm --filter @basira/api db:migrate",
+    "db:push": "pnpm --filter @basira/api db:push",
+    "db:seed": "pnpm --filter @basira/api db:seed",
+    "demo:seed": "pnpm --filter @basira/api demo:seed",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "ioredis": "5.11.1"
+    }
+  }
+}

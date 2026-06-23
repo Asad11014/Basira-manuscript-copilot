@@ -1,0 +1,55 @@
+/* Arabic-script fonts + an elegant display serif for headings, bundled via
+   Google Fonts so RTL and the scholarly look render consistently (§11). */
+@import url('https://fonts.googleapis.com/css2?family=Amiri&family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Inter:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-ink-50 text-ink-900 font-sans antialiased;
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(42, 37, 31, 0.035) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    @apply font-serif;
+  }
+}
+
+/* RTL-aware Arabic text: shapes correctly and reads right-to-left. */
+.arabic {
+  @apply font-naskh;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+/* Quiet, slim scrollbars inside the panes. */
+.pane-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: theme('colors.ink.200') transparent;
+}
+.pane-scroll::-webkit-scrollbar {
+  width: 9px;
+}
+.pane-scroll::-webkit-scrollbar-thumb {
+  background-color: theme('colors.ink.200');
+  border-radius: 9999px;
+}
