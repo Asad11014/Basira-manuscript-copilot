@@ -5,10 +5,20 @@ replace the printed-Arabic OpenITI model. We transfer-learn from the OpenITI
 model (it already knows the Arabic alphabet) on the **`aamijar/muharaf-public`**
 line dataset (24,495 line image↔text pairs).
 
-> ⚠️ **Licence:** `aamijar/muharaf-public` is **CC-BY-NC-SA-4.0 (non-commercial)**.
-> Use the resulting model for **R&D / evaluation only**. For a commercial model,
-> retrain on the **MIT-licensed `TheRealOKAI/muharaf-public-pages`** (segment it
-> into lines first) or on your own corrected pages (the in-app flywheel).
+> ⚠️ **Licence — verified at source.** The Muharaf authors distribute the dataset
+> under **CC BY-NC-SA 4.0 (non-commercial)** — confirmed on the official
+> [GitHub repo](https://github.com/MehreenMehreen/muharaf) ("We distribute this
+> dataset under the CC BY-NC-SA 4.0.") and [Zenodo record](https://zenodo.org/records/11492215).
+> A third-party Hugging Face mirror mislabels it "MIT" — that label is **invalid**
+> (a re-uploader cannot relicense the authors' work). Treat **all** Muharaf mirrors
+> as non-commercial.
+>
+> ➡️ A model trained on Muharaf is for **R&D / feasibility evaluation only**.
+> The **commercial production model** must be trained on data you have rights to:
+> your own scholar-corrected pages (the in-app flywheel), commissioned
+> transcriptions of public-domain manuscripts, or a separately negotiated
+> commercial licence from the Muharaf authors. Confirm with counsel before any
+> commercial use.
 
 > 🖥️ **Run this on a GPU** (Google Colab / Kaggle free tier). 22k lines on the
 > local CPU-only Docker would take far too long. The output `.mlmodel` then plugs
